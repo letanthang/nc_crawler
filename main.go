@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -31,7 +32,7 @@ func main() {
 		}
 	}()
 
-	// receive result
+	// receive result : assign more work
 	for result := range resultChan {
 		fmt.Println("Find one", result)
 		crawlResult = append(crawlResult, result)
@@ -49,11 +50,19 @@ func Worker(url string, resultChan chan ParseResult) {
 	resultChan <- ParseFake(url)
 }
 
+var m sync.Mutex
+
 var count int
 
 func ParseFake(url string) ParseResult {
+	var i int
+
+	m.Lock()
 	count++
-	switch count {
+	i = count
+	m.Unlock()
+
+	switch i {
 	case 1:
 		return ParseResult{Title: "Bai viet 1", Content: "content 1", URLs: []string{"http://1", "http://2", "http://3", "http://4"}}
 	case 2:
