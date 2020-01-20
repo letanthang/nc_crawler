@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -26,28 +29,57 @@ func main() {
 	}()
 
 	// share work
+
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		for url := range ch {
-			go Worker(url, resultChan)
+			go Worker(ctx, url, resultChan)
 		}
 	}()
 
 	// receive result : assign more work
 	for result := range resultChan {
+		// stop criteria : 5 result
+		// when stop condition - close channel (ch, resultChannel)
+		// panic recover
+
 		fmt.Println("Find one", result)
 		crawlResult = append(crawlResult, result)
-		for _, url := range result.URLs {
-			if crawlUrls[url] == false {
-				crawlUrls[url] = true
-				ch <- url
+		if len(crawlResult) == 5 {
+			cancel()
+			close(resultChan)
+		} else {
+			for _, url := range result.URLs {
+				if crawlUrls[url] == false {
+					crawlUrls[url] = true
+					ch <- url
+				}
 			}
 		}
+
 	}
+
+	fmt.Println("Num of results:", len(crawlResult))
+	bs, _ := json.MarshalIndent(crawlResult, "", "  ")
+	fmt.Println("Detail:", string(bs))
 
 }
 
-func Worker(url string, resultChan chan ParseResult) {
-	resultChan <- ParseFake(url)
+func Worker(ctx context.Context, url string, resultChan chan ParseResult) {
+	temp := make(chan ParseResult)
+	go func() {
+		temp <- ParseFake(url)
+	}()
+
+	select {
+	case v := <-temp:
+		resultChan <- v
+		return
+	case <-ctx.Done():
+		fmt.Println("Done signal")
+		return
+	}
+
 }
 
 var m sync.Mutex
@@ -61,6 +93,9 @@ func ParseFake(url string) ParseResult {
 	count++
 	i = count
 	m.Unlock()
+
+	ms := 200 + rand.Intn(300-200)
+	time.Sleep(time.Duration(ms) * time.Millisecond)
 
 	switch i {
 	case 1:
