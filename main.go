@@ -68,6 +68,7 @@ func main() {
 func Worker(ctx context.Context, url string, resultChan chan ParseResult) {
 	temp := make(chan ParseResult)
 	go func() {
+		//working: parse url to content, author, urls,...
 		temp <- ParseFake(url)
 	}()
 
